@@ -250,25 +250,43 @@ Quadtree *Quadtree::fetch_deepest_node(int iStart, int iAmount)
 }
 
 // auxiliary function used by fetch_deepest_node().
-Quadtree *Quadtree::fetch_deepest_node_internal(Quadtree *t, int iStart, int iAmount)
+// Quadtree *Quadtree::fetch_deepest_node_internal(Quadtree *t, int iStart, int iAmount)
+Quadtree *Quadtree::fetch_deepest_node_internal(Quadtree *t, int iStart, int iAmount, const std::vector<float> *vecSearchX, const std::vector<float> *vecSearchY)
 {
 	int count_inside = iAmount;
 
-	// prevent a "Conditional jump or move depends on uninitialised value(s)" detected by valgrind
-	if ((t->parent == t) && (t->northEast == nullptr) && (t->northWest == nullptr) && (t->southEast == nullptr) && (t->southWest == nullptr))
+	// used in 'relocate_element' -> do not use the 'ptrToX/Y-vectors' here
+	if (vecSearchX == nullptr)
 	{
-		return t;
+		vecSearchX = ptrToX;
 	}
-	else
+
+	if (vecSearchY == nullptr)
 	{
+		vecSearchY = ptrToY;
+	}
+
 		// check if the (end)points of the element reside completely in this node
 		for (int i = iStart; i < (iStart+iAmount); i++)
 		{
-			if ((*ptrToX)[i] > boundary2->cx+boundary2->dim or (*ptrToX)[i] <= boundary2->cx-boundary2->dim or (*ptrToY)[i] > boundary2->cy+boundary2->dim or (*ptrToY)[i] <= boundary2->cy-boundary2->dim)
+			if ((*vecSearchX)[i] > boundary2->cx+boundary2->dim or (*vecSearchX)[i] <= boundary2->cx-boundary2->dim or (*vecSearchY)[i] > boundary2->cy+boundary2->dim or (*vecSearchY)[i] <= boundary2->cy-boundary2->dim)
 			{
 				count_inside--;
 			}
 		}
+
+// 	std::cout << " search: " << iStart << " / " << iAmount << " ||| x:" << (*vecSearchX)[iStart] << " / "  << (*vecSearchX)[iStart+1] << " / " << (*vecSearchX)[iStart+2] << " ||| y:" << (*vecSearchY)[iStart+0] << " / "  << (*vecSearchY)[iStart+1] << " / "  << (*vecSearchY)[iStart+2] << std::endl;
+
+	// prevent a "Conditional jump or move depends on uninitialised value(s)" detected by valgrind. Last node remaining is the rootnode (t->parent == t) and this node has not been split (t->northEast == nullptr) and the object lies completely outside the rootnode (count_inside == 0) -> return the nullpointer.
+	if ((t->parent == t) && (t->northEast == nullptr) && (count_inside == 0))
+	{
+// 		std::cout << "CATCH" << std::endl;
+// 		exit(1);
+		return nullptr;
+	}
+	else
+	{
+
 
 		// object resides completely inside the given node
 		if (count_inside == iAmount)
@@ -282,10 +300,10 @@ Quadtree *Quadtree::fetch_deepest_node_internal(Quadtree *t, int iStart, int iAm
 			}
 			else
 			{
-				t = northEast->fetch_deepest_node_internal(t, iStart, iAmount);
-				t = northWest->fetch_deepest_node_internal(t, iStart, iAmount);
-				t = southWest->fetch_deepest_node_internal(t, iStart, iAmount);
-				t = southEast->fetch_deepest_node_internal(t, iStart, iAmount);
+				t = northEast->fetch_deepest_node_internal(t, iStart, iAmount, vecSearchX, vecSearchY);
+				t = northWest->fetch_deepest_node_internal(t, iStart, iAmount, vecSearchX, vecSearchY);
+				t = southWest->fetch_deepest_node_internal(t, iStart, iAmount, vecSearchX, vecSearchY);
+				t = southEast->fetch_deepest_node_internal(t, iStart, iAmount, vecSearchX, vecSearchY);
 			}
 		}
 	}
@@ -557,7 +575,7 @@ bool Quadtree::insert(int iStart, int iAmount)
 	// object lies completely outside of the root node
 	if ((count_inside == 0) and (this == this->parent))
 	{
-		std::cout << "\033[1;31m" << "Object completely outside of rootnode!!!" << "\033[0m\n";
+// 		std::cout << "\033[1;31m" << "Object completely outside of rootnode!!!" << "\033[0m\n";
 
 		return false;
 	}
@@ -845,12 +863,12 @@ int Quadtree::count_elements(Quadtree *t)
 // auxiliary function used by delete_element(). Used to collapse nodes and redistribute elements after collapsing.
 void Quadtree::concatenate_nodes(Quadtree *concat_this_node_maybe)
 {
-	if (concat_this_node_maybe->parent == concat_this_node_maybe)   // point resides in parent -> do nothing
+	if (concat_this_node_maybe->parent == concat_this_node_maybe)   // element resides in parent -> do nothing
 	{
 	}
 	else
 	{
-		// Concatenate because all four nodes (3 sibling nodes and the one where the point lies) are leaf nodes (deepest nodes possible)
+		// Concatenate because all four nodes (3 sibling nodes and the one where the element lies) are leaf nodes (deepest nodes possible)
         if ((concat_this_node_maybe->parent->northEast->northEast == nullptr) && (concat_this_node_maybe->parent->northWest->northEast == nullptr) && (concat_this_node_maybe->parent->southEast->northEast == nullptr) && (concat_this_node_maybe->parent->southWest->northEast == nullptr))
 		{
 			int amtElemntsNE = concat_this_node_maybe->parent->northEast->element_start.size();
@@ -1163,7 +1181,6 @@ bool Quadtree::delete_element(int iStart, int iAmount)
 	// try to locate the node where the point lies
 	Quadtree *fetch_node = fetch_deepest_node(iStart, iAmount);
 
-
 	if (fetch_node == nullptr)   // this element is not in the QT
 	{
 		std::cout << "delete_element -> cant find node corresponding to the element" << std::endl;
@@ -1171,6 +1188,7 @@ bool Quadtree::delete_element(int iStart, int iAmount)
 	}
 	else
 	{
+// 		std::cout << "MUH" << std::endl;
 		// element resides in a leafnode, i.e., a deepest node possible. This means the element fits completely into a single (leaf)node. Remove the element from element_start and element_amount and then check, whether this was the only element (if this is the case, this node may be concatenated)
 
 		// element fits completely into a single node or one element, which does not fit into a single node or it  resides in the shared space of the root node
@@ -1288,6 +1306,82 @@ bool Quadtree::delete_element(int iStart, int iAmount)
 	return false;
 
 }
+
+
+bool Quadtree::relocate_element(int iStartPreMovement, int iAmountPreMovement, const std::vector<float>* relocateNewCoordinatesx, const std::vector<float>* relocateNewCoordinatesy)
+{
+/*
+  	std::cout << "\n RELOC  ~~> " << iStartPreMovement << "/" << iAmountPreMovement << " || " << (*relocateNewCoordinatesx).size() << "/" << (*relocateNewCoordinatesy).size() << std::endl;
+
+ 	std::cout << "tx3: " << (*relocateNewCoordinatesx)[0] << "/" << (*relocateNewCoordinatesx)[1] << "/" << (*relocateNewCoordinatesx)[2] << "/" << std::endl;
+ 	std::cout << "tx4: " << (*relocateNewCoordinatesy)[0] << "/" << (*relocateNewCoordinatesy)[1] << "/" << (*relocateNewCoordinatesy)[2] << "/" << std::endl;
+
+ 	std::cout << "kk5: " << (*ptrToX)[iStartPreMovement] << "/" << (*ptrToX)[iStartPreMovement+1] << "/" << (*ptrToX)[iStartPreMovement+2] << "/" << std::endl;
+ 	std::cout << "kk6: " << (*ptrToY)[iStartPreMovement+0] << "/" << (*ptrToY)[iStartPreMovement+1] << "/" << (*ptrToY)[iStartPreMovement+2] << "/" << std::endl;
+*/
+
+	// locate the node (pre movement)
+	Quadtree *fetchNodePre = fetch_deepest_node(iStartPreMovement, iAmountPreMovement);
+
+
+// 	std::cout << "=============" << std::endl;
+
+	// try to locate the node where the element lies (post movement)
+	Quadtree *ReturnNode = this;
+
+ 	Quadtree *fetchNodePost = fetch_deepest_node_internal(ReturnNode, 0, (*relocateNewCoordinatesx).size(), relocateNewCoordinatesx, relocateNewCoordinatesy);
+
+// 	std::cout << "=============" << std::endl;
+
+//  	std::cout << "NODES: " << fetchNodePost << "/" << fetchNodePre << std::endl;
+
+	// object stays in the same node if both (post/pre-nodes) are equal. Additionally this node should be the deepest one possible.
+	if (fetchNodePost == fetchNodePre and fetchNodePost->northEast == nullptr)
+	{
+
+		// just update the coordinates
+		for (int i = iStartPreMovement; i < iStartPreMovement + iAmountPreMovement; i++)
+		{
+			(*ptrToX)[i] = (*relocateNewCoordinatesx)[i - iStartPreMovement];
+			(*ptrToY)[i] = (*relocateNewCoordinatesy)[i - iStartPreMovement];
+		}
+
+		return true;
+	}
+	else
+	{
+		// delete element -> it has crossed 'node-borders'
+		delete_element(iStartPreMovement, iAmountPreMovement);
+
+		for (int i = iStartPreMovement; i < iStartPreMovement + iAmountPreMovement; i++)
+		{
+			(*ptrToX)[i] = (*relocateNewCoordinatesx)[i - iStartPreMovement];
+			(*ptrToY)[i] = (*relocateNewCoordinatesy)[i - iStartPreMovement];
+		}
+
+		// reinsert it (TODO: DONT reinsert from the root node -> try to insert into parent node)
+		bool tryInsert = insert(iStartPreMovement, iAmountPreMovement);
+
+		// element moved out of the qt
+		if (tryInsert == false)
+		{
+			return false;
+		}
+		else
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+
+
+
+
+
+
 
 // visualizes the nodes, which can be concatenated (colored) and the nodes which only inherits elements in the shared space (shared_element_start, shared_element_amount). The latter are colored grey.
 void Quadtree::find_concatenable_shared_nodes(Quadtree *t)

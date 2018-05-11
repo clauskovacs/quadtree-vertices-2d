@@ -48,7 +48,7 @@ class Quadtree
 		std::vector<int> shared_element_amount;
 
 		// minimum amount of pts to split the node
-		unsigned int maxAmtElements = 2;
+		unsigned int maxAmtElements = 1;
 
 		// maximum depth of the children nodes
 		int maxDepth = 5;
@@ -81,7 +81,7 @@ class Quadtree
 		Quadtree* fetch_deepest_node(int iStart, int iAmount);
 
 		// auxiliary function used by fetch_deepest_node().
-		Quadtree* fetch_deepest_node_internal(Quadtree* t, int iStart, int iAmount);
+		Quadtree* fetch_deepest_node_internal(Quadtree* t, int iStart, int iAmount, const std::vector<float> *vecSearchX = nullptr, const std::vector<float> *vecSearchY = nullptr);
 
 		// auxiliary function used by fetch_elements().
 		void fetch_elements_internal(std::set< std::pair<int,int> > &vec, Quadtree *t, int iStart, int iAmount);
@@ -96,7 +96,10 @@ class Quadtree
 
 	public:
 		// constructor
-		Quadtree(std::shared_ptr<BoundaryBox> BB_init, Quadtree *parent, int _nodeDepth, std::vector<float> *iVecX, std::vector<float> *iVecY);
+		Quadtree(std::shared_ptr<BoundaryBox> BB_init, Quadtree *parent, int _nodeDepth, std::vector<float>* iVecX, std::vector<float>* iVecY);
+
+		// relocate a single element
+		bool relocate_element(int index_search_start, int index_search_amount, const std::vector<float>* relocateOldCoordinatesx, const std::vector<float>* relocateOldCoordinatesy);
 
 		// destructor
 		~Quadtree();
