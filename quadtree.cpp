@@ -89,23 +89,6 @@ void Quadtree::clearNode()
 }
 
 
-// recursively insert a element into all leaf nodes (deepest nodes possible) of a given node (*t)
-void Quadtree::recursive_entry(Quadtree *t, int iStart, int iAmount)
-{
-	if (t->northEast == nullptr)
-	{
-		t->shared_element_start.push_back(iStart);
-		t->shared_element_amount.push_back(iAmount);
-	}
-	else
-	{
-		recursive_entry(t->northEast, iStart, iAmount);
-		recursive_entry(t->northWest, iStart, iAmount);
-		recursive_entry(t->southEast, iStart, iAmount);
-		recursive_entry(t->southWest, iStart, iAmount);
-	}
-}
-
 // recursively remove a element from the shared space of all leafnodes containing a given node *t
 void Quadtree::recursive_remove(Quadtree *t, int iStart, int iAmount)
 {
@@ -142,11 +125,6 @@ void Quadtree::recursive_remove(Quadtree *t, int iStart, int iAmount)
 		recursive_remove(t->southWest, iStart, iAmount);
 	}
 }
-
-
-
-
-
 
 
 // recursively remove a element from the shared space of all leafnodes containing a given node *t
@@ -189,23 +167,38 @@ void Quadtree::recursive_removeAABB(Quadtree *t, float xmin, float xmax, float y
 			}
 		}
 	}
+	// no collision
 	else
 	{
-//  		std::cout << "NO COLL" << std::endl;
 	}
 }
 
 
+// generate a AABB-boundary box (defined by xmin, xmax, ymin, ymax)
+std::tuple<float, float, float, float> Quadtree::genAABBBox(int iStart, int iAmount)
+{
+	float xmin = std::numeric_limits<float>::max();
+	float xmax = -std::numeric_limits<float>::max();
+	float ymin = std::numeric_limits<float>::max();
+	float ymax = -std::numeric_limits<float>::max();
 
+	for (int i = iStart; i < (iStart+iAmount); i++)
+	{
+		if ((*ptrToX)[i] < xmin)
+			xmin = (*ptrToX)[i];
 
+		if ((*ptrToX)[i] > xmax)
+			xmax = (*ptrToX)[i];
 
+		if ((*ptrToY)[i] < ymin)
+			ymin = (*ptrToY)[i];
 
+		if ((*ptrToY)[i] > ymax)
+			ymax = (*ptrToY)[i];
+	}
 
-
-
-
-
-
+    return std::make_tuple(xmin, xmax, ymin, ymax);
+}
 
 
 // drawing & colorpicking routine (used by traverse_and_draw). Used by traverse_and_draw()
@@ -236,7 +229,6 @@ void Quadtree::colorPick(float elevate, Quadtree *t, float *depthColor, int dept
 
 	}
 }
-
 
 
 // fetch the (deepest) node in which the given element resides
@@ -275,19 +267,13 @@ Quadtree *Quadtree::fetch_deepest_node_internal(Quadtree *t, int iStart, int iAm
 			}
 		}
 
-// 	std::cout << " search: " << iStart << " / " << iAmount << " ||| x:" << (*vecSearchX)[iStart] << " / "  << (*vecSearchX)[iStart+1] << " / " << (*vecSearchX)[iStart+2] << " ||| y:" << (*vecSearchY)[iStart+0] << " / "  << (*vecSearchY)[iStart+1] << " / "  << (*vecSearchY)[iStart+2] << std::endl;
-
 	// prevent a "Conditional jump or move depends on uninitialised value(s)" detected by valgrind. Last node remaining is the rootnode (t->parent == t) and this node has not been split (t->northEast == nullptr) and the object lies completely outside the rootnode (count_inside == 0) -> return the nullpointer.
 	if ((t->parent == t) && (t->northEast == nullptr) && (count_inside == 0))
 	{
-// 		std::cout << "CATCH" << std::endl;
-// 		exit(1);
 		return nullptr;
 	}
 	else
 	{
-
-
 		// object resides completely inside the given node
 		if (count_inside == iAmount)
 		{
@@ -311,59 +297,10 @@ Quadtree *Quadtree::fetch_deepest_node_internal(Quadtree *t, int iStart, int iAm
 	return t;
 }
 
-// OLD ONE
-// auxiliary function used by fetch_elements().
-void Quadtree::fetch_elements_internal(std::set< std::pair<int, int> > &vec, Quadtree *t, int iStart, int iAmount)
-{
-	if ((int)t->element_start.size() != (int)t->element_amount.size())
-	{
-		std::cout << "internal build err1" << std::endl;
-		exit(1);
-	}
-
-	if ((int)t->shared_element_start.size() != (int)t->shared_element_start.size())
-	{
-		std::cout << "internal build err2" << std::endl;
-		exit(1);
-	}
-
-	for (int i = 0; i < (int)t->element_start.size(); i++)
-	{
-		vec.insert(std::make_pair(t->element_start[i], t->element_amount[i]));
-	}
-
-	for (int i = 0; i < (int)t->shared_element_start.size(); i++)
-	{
-		vec.insert(std::make_pair(t->shared_element_start[i], t->shared_element_amount[i]));
-	}
-
-	if (t->northEast != nullptr)
-	{
-		fetch_elements_internal(vec, t->northEast, iStart, iAmount);
-	}
-
-	if (t->northWest != nullptr)
-	{
-		fetch_elements_internal(vec, t->northWest,  iStart, iAmount);
-	}
-
-	if (t->southEast != nullptr)
-	{
-		fetch_elements_internal(vec, t->southEast,  iStart, iAmount);
-	}
-
-	if (t->southWest != nullptr)
-	{
-		fetch_elements_internal(vec, t->southWest,  iStart, iAmount);
-	}
-}
-
 
 // auxiliary function used by fetch_elements().
 void Quadtree::fetch_elements_internal2(std::set< std::pair<int, int> > &vec, Quadtree *t, float xmin, float xmax, float ymin, float ymax)
 {
-// void Quadtree::test2(Quadtree* t, float xmin, float xmax, float ymin, float ymax, int iStart, int iAmount)
-// {
 	// collision if:
 	if ((xmax > t->boundary2->cx-t->boundary2->dim) and (xmin < t->boundary2->cx+t->boundary2->dim) and (ymin < t->boundary2->cy+t->boundary2->dim) and (ymax > t->boundary2->cy-t->boundary2->dim))
 	{
@@ -376,8 +313,6 @@ void Quadtree::fetch_elements_internal2(std::set< std::pair<int, int> > &vec, Qu
 		}
 		else	// deepest node possible
 		{
-// 			t->shared_element_start.push_back(iStart);
-// 			t->shared_element_amount.push_back(iAmount);
 			// push elements into the vec
 			for (int i = 0; i < (int)t->element_start.size(); i++)
 			{
@@ -389,22 +324,13 @@ void Quadtree::fetch_elements_internal2(std::set< std::pair<int, int> > &vec, Qu
 				vec.insert(std::make_pair(t->shared_element_start[i], t->shared_element_amount[i]));
 			}
 		}
-// 		std::cout << "COLLISION" << std::endl;
 	}
+	// no collision
 	else
 	{
-//  		std::cout << "NO COLL" << std::endl;
 	}
-// }
 }
 
-
-std::set< std::pair<int,int> > Quadtree::fetch_elements_AABB_external(float xmin, float xmax, float ymin, float ymax)
-{
-	std::set< std::pair<int, int> > vec;
-	fetch_elements_internal2(vec, this, xmin, xmax, ymin, ymax);
-	return vec;
-}
 
 // returns all possible colliding elements corresponding to the node in which this element (iStart, iAmount) resides
 std::set< std::pair<int,int> > Quadtree::fetch_elements(int iStart, int iAmount)
@@ -415,121 +341,22 @@ std::set< std::pair<int,int> > Quadtree::fetch_elements(int iStart, int iAmount)
 	// create the vec for returning the elements
 	std::set< std::pair<int, int> > vec;
 
+	// TODO: FASTER THAN WITH FETCH_NODE?
+	// generate the AABB boundary box
+	auto returnAABB = genAABBBox(iStart, iAmount);
+	float xmin = std::get<0>(returnAABB);
+	float xmax = std::get<1>(returnAABB);
+	float ymin = std::get<2>(returnAABB);
+	float ymax = std::get<3>(returnAABB);
 
+	fetch_elements_internal2(vec, this, xmin, xmax, ymin, ymax);
 	// FASTER THAN WITH FETCH_NODE?
-		// generate the AABB boundary box
-		float xmin = 100.0;
-		float xmax = -100.0;
-		float ymin = 100.0;
-		float ymax = -100.0;
-
-		for (int i = iStart; i < (iStart+iAmount); i++)
-		{
-			if ((*ptrToX)[i] > xmax)
-				xmax = (*ptrToX)[i];
-
-			if ((*ptrToX)[i] < xmin)
-				xmin = (*ptrToX)[i];
-
-			if ((*ptrToY)[i] > ymax)
-				ymax = (*ptrToY)[i];
-
-			if ((*ptrToY)[i] < ymin)
-				ymin = (*ptrToY)[i];
-		}
-
-		fetch_elements_internal2(vec, this, xmin, xmax, ymin, ymax);
-	// FASTER THAN WITH FETCH_NODE?
-
-/*
-	// deepest node possible -> retrieve only elements from this node
-	if (fetch_node->northWest == nullptr)
-	{
- 		std::cout << "deepest node possible" << std::endl;
-
-		for (int i = 0; i < (int)fetch_node->element_start.size(); i++)
-		{
-			vec.insert(std::make_pair(fetch_node->element_start[i], fetch_node->element_amount[i]));
-		}
-
-		for (int i = 0; i < (int)fetch_node->shared_element_start.size(); i++)
-		{
-			vec.insert(std::make_pair(fetch_node->shared_element_start[i], fetch_node->shared_element_amount[i]));
-		}
-	}
-	else
-	{
-		// generate the AABB boundary box
-		float xmin = 100.0;
-		float xmax = -100.0;
-		float ymin = 100.0;
-		float ymax = -100.0;
-
-		for (int i = iStart; i < (iStart+iAmount); i++)
-		{
-			if ((*ptrToX)[i] > xmax)
-				xmax = (*ptrToX)[i];
-
-			if ((*ptrToX)[i] < xmin)
-				xmin = (*ptrToX)[i];
-
-			if ((*ptrToY)[i] > ymax)
-				ymax = (*ptrToY)[i];
-
-			if ((*ptrToY)[i] < ymin)
-				ymin = (*ptrToY)[i];
-		}
-
-		fetch_elements_internal2(vec, fetch_node, xmin, xmax, ymin, ymax);
-	}
-
-// 	fetch_elements_internal(vec, fetch_node, iStart, iAmount);
-*/
 
 	return vec;
 }
 
 
-void Quadtree::test(float xmin, float xmax, float ymin, float ymax)
-{
-//  	std::cout << " test || xmin: " << xmin << " / xmax: " << xmax << " /// ymin: " << ymin << " / ymax: " << ymax << std::endl;
-
-	// collision if:
-	if ((xmax > boundary2->cx-boundary2->dim) and (xmin < boundary2->cx+boundary2->dim) and (ymin < boundary2->cy+boundary2->dim) and (ymax > boundary2->cy-boundary2->dim))
-	{
-		if (northWest != nullptr)	// this node has been split yet -> != nullptr
-		{
-			northWest->test(xmin, xmax, ymin, ymax);
-			northEast->test(xmin, xmax, ymin, ymax);
-			southWest->test(xmin, xmax, ymin, ymax);
-			southEast->test(xmin, xmax, ymin, ymax);
-		}
-		else	// deepest node possible
-		{
-			float centerx = boundary2->cx;
-			float centery = boundary2->cy;
-			float dim = boundary2->dim;
-
-			float elevate = -10.0;
-
-			glColor4f(0.0f, 0.0f, 0.0f, 0.25f);
-
-			glBegin(GL_TRIANGLE_STRIP);
-				glVertex3f(centerx+dim, centery+dim, elevate);
-				glVertex3f(centerx+dim, centery-dim, elevate);
-				glVertex3f(centerx-dim, centery+dim, elevate);
-				glVertex3f(centerx-dim, centery-dim, elevate);
-			glEnd();
-		}
-// 		std::cout << "COLLISION" << std::endl;
-	}
-	else
-	{
-//  		std::cout << "NO COLL" << std::endl;
-	}
-}
-
-
+// recursively insert a element into all leaf nodes (deepest nodes possible) of a given node (*t)
 void Quadtree::test2(Quadtree* t, float xmin, float xmax, float ymin, float ymax, int iStart, int iAmount)
 {
 	// collision if:
@@ -547,14 +374,12 @@ void Quadtree::test2(Quadtree* t, float xmin, float xmax, float ymin, float ymax
 			t->shared_element_start.push_back(iStart);
 			t->shared_element_amount.push_back(iAmount);
 		}
-// 		std::cout << "COLLISION" << std::endl;
 	}
+	// no collision
 	else
 	{
-//  		std::cout << "NO COLL" << std::endl;
 	}
 }
-
 
 
 // insert one point into the tree. Split the tree and relocate the points ot the node if necessary
@@ -576,7 +401,6 @@ bool Quadtree::insert(int iStart, int iAmount)
 	if ((count_inside == 0) and (this == this->parent))
 	{
 // 		std::cout << "\033[1;31m" << "Object completely outside of rootnode!!!" << "\033[0m\n";
-
 		return false;
 	}
 
@@ -585,37 +409,20 @@ bool Quadtree::insert(int iStart, int iAmount)
 		if (count_inside > 0)
 		{
 			// generate the AABB boundary box
-			float xmin = 100.0;
-			float xmax = -100.0;
-			float ymin = 100.0;
-			float ymax = -100.0;
-
-			for (int i = iStart; i < (iStart+iAmount); i++)
-			{
-				if ((*ptrToX)[i] > xmax)
-					xmax = (*ptrToX)[i];
-
-				if ((*ptrToX)[i] < xmin)
-					xmin = (*ptrToX)[i];
-
-				if ((*ptrToY)[i] > ymax)
-					ymax = (*ptrToY)[i];
-
-				if ((*ptrToY)[i] < ymin)
-					ymin = (*ptrToY)[i];
-			}
-
+			auto returnAABB = genAABBBox(iStart, iAmount);
+			float xmin = std::get<0>(returnAABB);
+			float xmax = std::get<1>(returnAABB);
+			float ymin = std::get<2>(returnAABB);
+			float ymax = std::get<3>(returnAABB);
 
 			// insert recursively
 			if (this == this->parent)
 			{
-// 				recursive_entry(this, iStart, iAmount);
 				test2(this, xmin, xmax, ymin, ymax, iStart, iAmount);
 
 			}
 			else	// go one up, because the insert would only insert into the deepest node it searches (e.g. southEast but the element does NOT fit into southEast completely, so insert it into all sibling nodes)
 			{
-// 				recursive_entry(this->parent, iStart, iAmount);
 				test2(this->parent, xmin, xmax, ymin, ymax, iStart, iAmount);
 			}
 
@@ -658,59 +465,13 @@ bool Quadtree::insert(int iStart, int iAmount)
 		for (int i = 0; i < (int)shared_element_start.size(); i++)
 		{
 			// generate the AABB boundary box
-			float xmin = 100.0;
-			float xmax = -100.0;
-			float ymin = 100.0;
-			float ymax = -100.0;
+			auto returnAABB = genAABBBox(shared_element_start[i], shared_element_amount[i]);
+			float xmin = std::get<0>(returnAABB);
+			float xmax = std::get<1>(returnAABB);
+			float ymin = std::get<2>(returnAABB);
+			float ymax = std::get<3>(returnAABB);
 
-			for (int ii = shared_element_start[i]; ii < (shared_element_start[i]+shared_element_amount[i]); ii++)
-			{
-				if ((*ptrToX)[ii] > xmax)
-					xmax = (*ptrToX)[ii];
-
-				if ((*ptrToX)[ii] < xmin)
-					xmin = (*ptrToX)[ii];
-
-				if ((*ptrToY)[ii] > ymax)
-					ymax = (*ptrToY)[ii];
-
-				if ((*ptrToY)[ii] < ymin)
-					ymin = (*ptrToY)[ii];
-			}
-
-
-// 			recursive_entry(this, shared_element_start[i], shared_element_amount[i]);
 			test2(this, xmin, xmax, ymin, ymax, shared_element_start[i], shared_element_amount[i]);
-/*
-			// check the insertion
-			int i0 = this->northEast->shared_element_start.size();
-			int i1 = this->northWest->shared_element_start.size();
-			int i2 = this->southEast->shared_element_start.size();
-			int i3 = this->southWest->shared_element_start.size();
-
-			int minimum1 = std::min( { i0, i1, i2, i3 } );
-			int maximum1a = std::max( { i0, i1, i2, i3 } );
-
-			if (minimum1 != maximum1a)
-			{
-				std::cout << "discrepance between min/max1" << std::endl;
-				exit(1);
-			}
-
-			int ii0 = this->northEast->shared_element_amount.size();
-			int ii1 = this->northWest->shared_element_amount.size();
-			int ii2 = this->southEast->shared_element_amount.size();
-			int ii3 = this->southWest->shared_element_amount.size();
-
-			int minimum11 = std::min( { ii0, ii1, ii2, ii3 } );
-			int maximum11a = std::max( { ii0, ii1, ii2, ii3 } );
-
-			if (minimum11 != maximum11a)
-			{
-				std::cout << "discrepance between min/max2" << std::endl;
-				exit(1);
-			}
-*/
 		}
 
 		shared_element_start.clear();
@@ -828,36 +589,42 @@ int Quadtree::count_nodes(Quadtree *t)
 	return 1;
 }
 
-// count the elements residing in the tree
-int Quadtree::count_elements(Quadtree *t)
-{
-	// TODO: count shared elements too
-	int fetch_elements = 0;
 
+// used by count_elements()
+void Quadtree::count_elements_internal(Quadtree* t, std::set< std::pair<int, int> > &count_shared_elements)
+{
 	// node has been split - continue with the recursion
 	if (t->northEast != nullptr)
 	{
-		fetch_elements += northEast->count_elements(northEast);
-		fetch_elements += southEast->count_elements(southEast);
-		fetch_elements += southWest->count_elements(southWest);
-		fetch_elements += northWest->count_elements(northWest);
+		count_elements_internal(t->northEast, count_shared_elements);
+		count_elements_internal(t->southEast, count_shared_elements);
+		count_elements_internal(t->southWest, count_shared_elements);
+		count_elements_internal(t->northWest, count_shared_elements);
 	}
 	// deepest (child)node possible
 	else
 	{
-		if (t->element_start.size() > 0)	// there are elements in this node
+		for (int i = 0; i < (int)t->element_start.size(); i++)
 		{
-			fetch_elements += t->element_start.size();
+			count_shared_elements.insert(std::make_pair(t->element_start[i], t->element_amount[i]));
+		}
+
+		for (int ii = 0; ii < (int)t->shared_element_amount.size(); ii++)
+		{
+ 			count_shared_elements.insert(std::make_pair(t->shared_element_start[ii], t->shared_element_amount[ii]));
 		}
 	}
-
-	return fetch_elements;
 }
 
+// count the elements residing in the tree
+int Quadtree::count_elements(Quadtree *t)
+{
+	std::set< std::pair<int, int> > count_shared_elements;
 
+	count_elements_internal(t, count_shared_elements);
 
-
-
+	return count_shared_elements.size();
+}
 
 
 // auxiliary function used by delete_element(). Used to collapse nodes and redistribute elements after collapsing.
@@ -936,12 +703,6 @@ void Quadtree::concatenate_nodes(Quadtree *concat_this_node_maybe)
 				}
 
 				// move shared_element_start and shared_element_amount
-//  				int amtElemntsNE = concat_this_node_maybe->parent->northEast->shared_element_start.size();
-//  				int amtElemntsNW = concat_this_node_maybe->parent->northWest->shared_element_start.size();
-//  				int amtElemntsSE = concat_this_node_maybe->parent->southEast->shared_element_start.size();
-// 				int amtElemntsSW = concat_this_node_maybe->parent->southWest->shared_element_start.size();
-
-
 				std::set< std::pair<int, int> > insert_shared_elements;
 				std::set< std::pair<int, int> > insert_full_elements;
 
@@ -974,15 +735,11 @@ void Quadtree::concatenate_nodes(Quadtree *concat_this_node_maybe)
 					{
 						concatenate_retrieve_element = 1;
 						insert_full_elements.insert(std::make_pair(reshuf_element_start1, reshuf_element_amount1));
-// 						concat_this_node_maybe->parent->element_start.push_back(reshuf_element_start1);
-// 						concat_this_node_maybe->parent->element_amount.push_back(reshuf_element_amount1);
 					}
 					else
 					{
 						concatenate_retrieve_element = 2;
 						insert_shared_elements.insert(std::make_pair(reshuf_element_start1, reshuf_element_amount1));
-// 						concat_this_node_maybe->parent->shared_element_start.push_back(reshuf_element_start1);
-// 						concat_this_node_maybe->parent->shared_element_amount.push_back(reshuf_element_amount1);
 					}
 
 					if (concatenate_retrieve_element == 0)
@@ -1021,15 +778,11 @@ void Quadtree::concatenate_nodes(Quadtree *concat_this_node_maybe)
 					{
 						concatenate_retrieve_element = 1;
 						insert_full_elements.insert(std::make_pair(reshuf_element_start1, reshuf_element_amount1));
-// 						concat_this_node_maybe->parent->element_start.push_back(reshuf_element_start1);
-// 						concat_this_node_maybe->parent->element_amount.push_back(reshuf_element_amount1);
 					}
 					else
 					{
 						concatenate_retrieve_element = 2;
 						insert_shared_elements.insert(std::make_pair(reshuf_element_start1, reshuf_element_amount1));
-// 						concat_this_node_maybe->parent->shared_element_start.push_back(reshuf_element_start1);
-// 						concat_this_node_maybe->parent->shared_element_amount.push_back(reshuf_element_amount1);
 					}
 
 					if (concatenate_retrieve_element == 0)
@@ -1069,15 +822,11 @@ void Quadtree::concatenate_nodes(Quadtree *concat_this_node_maybe)
 					{
 						concatenate_retrieve_element = 1;
 						insert_full_elements.insert(std::make_pair(reshuf_element_start1, reshuf_element_amount1));
-// 						concat_this_node_maybe->parent->element_start.push_back(reshuf_element_start1);
-// 						concat_this_node_maybe->parent->element_amount.push_back(reshuf_element_amount1);
 					}
 					else
 					{
 						concatenate_retrieve_element = 2;
 						insert_shared_elements.insert(std::make_pair(reshuf_element_start1, reshuf_element_amount1));
-// 						concat_this_node_maybe->parent->shared_element_start.push_back(reshuf_element_start1);
-// 						concat_this_node_maybe->parent->shared_element_amount.push_back(reshuf_element_amount1);
 					}
 
 					if (concatenate_retrieve_element == 0)
@@ -1118,15 +867,11 @@ void Quadtree::concatenate_nodes(Quadtree *concat_this_node_maybe)
 					{
 						concatenate_retrieve_element = 1;
 						insert_full_elements.insert(std::make_pair(reshuf_element_start1, reshuf_element_amount1));
-// 						concat_this_node_maybe->parent->element_start.push_back(reshuf_element_start1);
-// 						concat_this_node_maybe->parent->element_amount.push_back(reshuf_element_amount1);
 					}
 					else
 					{
 						concatenate_retrieve_element = 2;
 						insert_shared_elements.insert(std::make_pair(reshuf_element_start1, reshuf_element_amount1));
-// 						concat_this_node_maybe->parent->shared_element_start.push_back(reshuf_element_start1);
-// 						concat_this_node_maybe->parent->shared_element_amount.push_back(reshuf_element_amount1);
 					}
 
 					if (concatenate_retrieve_element == 0)
@@ -1156,7 +901,6 @@ void Quadtree::concatenate_nodes(Quadtree *concat_this_node_maybe)
 					concat_this_node_maybe->parent->shared_element_amount.push_back(it2->second);
 				}
 
-
 				// generate a pointer to the next node to concatenate (prevents an invalid read)
 				Quadtree *concat_next = concat_this_node_maybe->parent;
 
@@ -1169,10 +913,6 @@ void Quadtree::concatenate_nodes(Quadtree *concat_this_node_maybe)
 		}
 	}
 }
-
-
-
-
 
 
 // remove a single element from the tree
@@ -1188,7 +928,6 @@ bool Quadtree::delete_element(int iStart, int iAmount)
 	}
 	else
 	{
-// 		std::cout << "MUH" << std::endl;
 		// element resides in a leafnode, i.e., a deepest node possible. This means the element fits completely into a single (leaf)node. Remove the element from element_start and element_amount and then check, whether this was the only element (if this is the case, this node may be concatenated)
 
 		// element fits completely into a single node or one element, which does not fit into a single node or it  resides in the shared space of the root node
@@ -1260,25 +999,11 @@ bool Quadtree::delete_element(int iStart, int iAmount)
 		else
 		{
 			// generate the AABB boundary box
-			float xmin = 100.0;
-			float xmax = -100.0;
-			float ymin = 100.0;
-			float ymax = -100.0;
-
-			for (int i = iStart; i < (iStart+iAmount); i++)
-			{
-				if ((*ptrToX)[i] > xmax)
-					xmax = (*ptrToX)[i];
-
-				if ((*ptrToX)[i] < xmin)
-					xmin = (*ptrToX)[i];
-
-				if ((*ptrToY)[i] > ymax)
-					ymax = (*ptrToY)[i];
-
-				if ((*ptrToY)[i] < ymin)
-					ymin = (*ptrToY)[i];
-			}
+			auto returnAABB = genAABBBox(iStart, iAmount);
+			float xmin = std::get<0>(returnAABB);
+			float xmax = std::get<1>(returnAABB);
+			float ymin = std::get<2>(returnAABB);
+			float ymax = std::get<3>(returnAABB);
 
 			// remove the element from all subnodes it resides
 			recursive_removeAABB(fetch_node, xmin, xmax, ymin, ymax, iStart, iAmount);
@@ -1299,41 +1024,22 @@ bool Quadtree::delete_element(int iStart, int iAmount)
 					concatenate_nodes(fetch_node->northEast);
 				}
 			}
-
 			return true;
 		}
 	}
 	return false;
-
 }
 
 
 bool Quadtree::relocate_element(int iStartPreMovement, int iAmountPreMovement, const std::vector<float>* relocateNewCoordinatesx, const std::vector<float>* relocateNewCoordinatesy)
 {
-/*
-  	std::cout << "\n RELOC  ~~> " << iStartPreMovement << "/" << iAmountPreMovement << " || " << (*relocateNewCoordinatesx).size() << "/" << (*relocateNewCoordinatesy).size() << std::endl;
-
- 	std::cout << "tx3: " << (*relocateNewCoordinatesx)[0] << "/" << (*relocateNewCoordinatesx)[1] << "/" << (*relocateNewCoordinatesx)[2] << "/" << std::endl;
- 	std::cout << "tx4: " << (*relocateNewCoordinatesy)[0] << "/" << (*relocateNewCoordinatesy)[1] << "/" << (*relocateNewCoordinatesy)[2] << "/" << std::endl;
-
- 	std::cout << "kk5: " << (*ptrToX)[iStartPreMovement] << "/" << (*ptrToX)[iStartPreMovement+1] << "/" << (*ptrToX)[iStartPreMovement+2] << "/" << std::endl;
- 	std::cout << "kk6: " << (*ptrToY)[iStartPreMovement+0] << "/" << (*ptrToY)[iStartPreMovement+1] << "/" << (*ptrToY)[iStartPreMovement+2] << "/" << std::endl;
-*/
-
 	// locate the node (pre movement)
 	Quadtree *fetchNodePre = fetch_deepest_node(iStartPreMovement, iAmountPreMovement);
-
-
-// 	std::cout << "=============" << std::endl;
 
 	// try to locate the node where the element lies (post movement)
 	Quadtree *ReturnNode = this;
 
  	Quadtree *fetchNodePost = fetch_deepest_node_internal(ReturnNode, 0, (*relocateNewCoordinatesx).size(), relocateNewCoordinatesx, relocateNewCoordinatesy);
-
-// 	std::cout << "=============" << std::endl;
-
-//  	std::cout << "NODES: " << fetchNodePost << "/" << fetchNodePre << std::endl;
 
 	// object stays in the same node if both (post/pre-nodes) are equal. Additionally this node should be the deepest one possible.
 	if (fetchNodePost == fetchNodePre and fetchNodePost->northEast == nullptr)
@@ -1375,12 +1081,6 @@ bool Quadtree::relocate_element(int iStartPreMovement, int iAmountPreMovement, c
 
 	return false;
 }
-
-
-
-
-
-
 
 
 // visualizes the nodes, which can be concatenated (colored) and the nodes which only inherits elements in the shared space (shared_element_start, shared_element_amount). The latter are colored grey.

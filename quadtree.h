@@ -65,9 +65,6 @@ class Quadtree
 		// clear the tree
 		void clear(Quadtree *t);
 
-		// recursively insert a element into all leaf nodes (deepest nodes possible) of a given node *t
-		void recursive_entry(Quadtree *t, int iStart, int iAmount);
-
 		// recursively remove a element from the shared space of all leafnodes containing a given node *t
 		void recursive_remove(Quadtree *t, int iStart, int iAmount);
 
@@ -84,15 +81,18 @@ class Quadtree
 		Quadtree* fetch_deepest_node_internal(Quadtree* t, int iStart, int iAmount, const std::vector<float> *vecSearchX = nullptr, const std::vector<float> *vecSearchY = nullptr);
 
 		// auxiliary function used by fetch_elements().
-		void fetch_elements_internal(std::set< std::pair<int,int> > &vec, Quadtree *t, int iStart, int iAmount);
-
 		void fetch_elements_internal2(std::set< std::pair<int,int> > &vec, Quadtree *t, float xmin, float xmax, float ymin, float ymax);
 
  		void recursive_removeAABB(Quadtree *t, float xmin, float xmax, float ymin, float ymax, int iStart, int iAmount);
 
+		// generate the AABB boundary box of an element (defined by iStart and iAmount)
+		std::tuple<float, float, float, float> genAABBBox(int iStart, int iAmount);
 
+		// recursively insert a element into all leaf nodes (deepest nodes possible) of a given node *t
+		void test2(Quadtree* t, float xmin, float xmax, float ymin, float ymax, int iStart, int iAmount);
 
-
+		// used by count_elements()
+		void count_elements_internal(Quadtree* t, std::set< std::pair<int, int> > &count_shared_elements);
 
 	public:
 		// constructor
@@ -122,21 +122,8 @@ class Quadtree
 		// returns all possible colliding elements corresponding to the node in which this element (iStart, iAmount) resides
 		std::set< std::pair<int,int> > fetch_elements(int iStart, int iAmount);
 
-
-
-		std::set< std::pair<int,int> > fetch_elements_AABB_external(float xmin, float xmax, float ymin, float ymax);
-
-
-
 		// remove a single element of the tree
 		bool delete_element(int iStart, int iAmount);
-
-		void test(float xmin, float xmax, float ymin, float ymax);
-
-		void test2(Quadtree* t, float xmin, float xmax, float ymin, float ymax, int iStart, int iAmount);
-
-		// relocate a single element of the tree
-// 		bool relocate_element(int iStart1, int iAmount1, int iStart2, int iAmount2);
 
 		// debuggingfunctions
 		// visualizes the nodes, which can be concatenated (colored) and the nodes which only inherits elements in the shared space (shared_element_start, shared_element_amount).  The latter are colored grey.
